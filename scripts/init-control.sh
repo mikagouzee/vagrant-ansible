@@ -2,20 +2,18 @@
 
 # Define variables
 CONTROL_NODE_IP=$1
-TARGET_IPs=$2
+TARGET_IPs=(${2//,/ })
 
-# Split the comma-separated string into an array
-IFS=',' read -r -a TARGET_IPs_ARRAY <<< "$TARGET_IPs"
 
 # Update and install required packages
 apt-get update -y
-apt-get install -y ansible sshpass
+apt-get install -y ansible sshpass git
 
 # Add control node and target nodes to /etc/hosts and Ansible inventory
 # mkdir -p /etc/ansible/hosts
 echo "$CONTROL_NODE_IP controlnode" >> /etc/hosts
 echo "[targets]" >> /etc/ansible/hosts
-for ip in ${TARGET_IPs_ARRAY[@]}; do
+for ip in ${TARGET_IPs[@]}; do
   echo "$ip" | sudo tee -a /etc/ansible/hosts
 done
 
