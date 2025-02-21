@@ -3,9 +3,11 @@
 #
 #Define your variables here. You want ONE control plane, but probably multiple targets
 CONTROL_NODE_IP = "172.66.1.99"
-CONTROL_NODE_IMAGE = "ubuntu/bionic64"
+CONTROL_NODE_IMAGE = "gusztavvargadr/ubuntu-server-2404-lts"
+TARGET_IMAGES =  "gusztavvargadr/ubuntu-server-2404-lts"
 # TARGET_IPs = ["172.16.1.51", "172.16.2.51", "172.16.3.51"]
-TARGET_IPs = ["172.16.1.51"]         
+TARGET_IPs = ["172.16.1.51"]
+     
 
 #Vagrant use the version 2 of the configure module and will use an object named "config" to execute our tasks
 Vagrant.configure("2") do |config|
@@ -13,7 +15,7 @@ Vagrant.configure("2") do |config|
     #we will define it's network and a few specs.
     TARGET_IPs.each_with_index do |ip, index|
         config.vm.define "target#{index+1}" do |target|
-            target.vm.box = "ubuntu/bionic64"
+            target.vm.box = TARGET_IMAGES
             target.vm.network "private_network", ip: ip
             target.vm.provider "virtualbox" do |vb|
                 vb.memory = "512"

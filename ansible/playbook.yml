@@ -1,0 +1,6 @@
+---
+- hosts: front
+  become: yes
+  roles:
+    - dotnet-setup
+    - front-end

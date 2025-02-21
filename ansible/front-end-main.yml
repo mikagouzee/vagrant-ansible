@@ -1,0 +1,61 @@
+---
+- name: apt-update
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: install-nginx
+  apt:
+    name: nginx
+    state: latest
+  notify:
+    - Restart nginx
+
+- name: Install apt-transport
+  apt:
+    name: apt-transport-https
+    state: present
+
+- name: Copy Nginx config
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/default
+  notify:
+    - Restart Nginx
+
+- name: Clone the Razor application code
+  git:
+    repo: 'https://github.com/mikagouzee/ehealth-front.git'
+    dest: /var/www/razor_app
+    force: yes
+    version: 'master'  # or the specific branch or tag
+
+- name: Build the Razor application
+  command: /usr/bin/dotnet build /var/www/razor_app
+
+- name: Create systemd service file
+  copy:
+    content: |
+      [Unit]
+      Description=Razor Application
+
+      [Service]
+      WorkingDirectory=/var/www/razor_app
+      ExecStart=/usr/bin/dotnet /var/www/razor_app/eHealth.dll
+      Restart=always
+      RestartSec=10
+      SyslogIdentifier=razor_app
+      User=www-data
+      Environment=ASPNETCORE_ENVIRONMENT=Production
+      Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/razor_app.service
+    mode: '0644'
+
+- name: Enable and start Razor Application
+  systemd:
+    name: razor_app
+    state: started
+    enabled: yes
