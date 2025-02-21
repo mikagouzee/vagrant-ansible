@@ -14,3 +14,9 @@ ssh-keyscan $ip | tee -a /home/vagrant/.ssh/known_hosts
 sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/node0$index/id_rsa vagrant@$ip
 chmod 644 /home/vagrant/.ssh/known_hosts
 chown vagrant:vagrant /home/vagrant/.ssh/known_hosts
+
+touch .ssh/config
+echo "Host target" >> .ssh/config
+echo "HostName $ip" >> .ssh/config
+echo "User vagrant" >> .ssh/config
+echo "IdentityFile .ssh/node0$index/id_rsa" >> .ssh/config
