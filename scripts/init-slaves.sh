@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # Define variables
 IP=$1
 INDEX=$2
 
 apt-get update -y
-echo "#$ip node0#$INDEX" >> /etc/hosts
+echo "#$ip node0$INDEX" >> /etc/hosts
 apt-get install -y python
 
 # Update sshd_config
