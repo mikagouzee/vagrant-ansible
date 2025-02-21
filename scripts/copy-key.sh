@@ -11,6 +11,6 @@ chown -R vagrant:vagrant /home/vagrant/.ssh
 
 echo "$ip node0$index" | sudo tee -a /etc/hosts
 ssh-keyscan $ip | tee -a /home/vagrant/.ssh/known_hosts
-sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/{$ip}/id_rsa vagrant@$ip
+sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/$ip/id_rsa vagrant@$ip
 chmod 644 /home/vagrant/.ssh/known_hosts
 chown vagrant:vagrant /home/vagrant/.ssh/known_hosts
