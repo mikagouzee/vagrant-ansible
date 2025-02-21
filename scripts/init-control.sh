@@ -24,7 +24,6 @@ index=1
 for ip in ${TARGET_IPs[@]}; do
   echo "working on adding $ip to control node configs"
   #execute the copy-keys.sh script from the source
+  bash ./vagrant-ansible/scripts/copy-key.sh $index $ip
   index=$((index+1))
 done
-chmod 644 /home/vagrant/.ssh/known_hosts
-chown vagrant:vagrant /home/vagrant/.ssh/known_hosts
