@@ -16,7 +16,7 @@ chmod 644 /home/vagrant/.ssh/known_hosts
 chown vagrant:vagrant /home/vagrant/.ssh/known_hosts
 
 sudo touch .ssh/config
-echo "Host target" >> .ssh/config
-echo "HostName $ip" >> .ssh/config
-echo "User vagrant" >> .ssh/config
-echo "IdentityFile .ssh/node0$index/id_rsa" >> .ssh/config
+sudo echo "Host target" >> .ssh/config
+sudo echo "HostName $ip" >> .ssh/config
+sudo echo "User vagrant" >> .ssh/config
+sudo echo "IdentityFile .ssh/node0$index/id_rsa" >> .ssh/config

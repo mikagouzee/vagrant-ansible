@@ -21,7 +21,7 @@ Vagrant.configure("2") do |config|
             end
             #the script will be slightly different, we will mostly install python to ensure ansible can work on those targets.
             target.vm.provision "shell", path: './scripts/init-slaves.sh', args:[ip,index]
-            target.vm.hostname = "node-0#{index+1}"
+            target.vm.hostname = "node0#{index+1}"
         end
     end
 
