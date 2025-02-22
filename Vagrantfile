@@ -1,44 +1,75 @@
-#https://stackoverflow.com/questions/43235179/how-to-execute-ssh-keygen-without-prompt
-#BEWARE : the sshpass considers the default user to be vagrant with default password; because it's a vagrant box.
-#
-#Define your variables here. You want ONE control plane, but probably multiple targets
-CONTROL_NODE_IP = "172.66.1.99"
-CONTROL_NODE_IMAGE = "gusztavvargadr/ubuntu-server-2404-lts"
-TARGET_IMAGES =  "gusztavvargadr/ubuntu-server-2404-lts"
-# TARGET_IPs = ["172.16.1.51", "172.16.2.51", "172.16.3.51"]
-TARGET_IPs = ["172.16.1.51"]
-     
+CONTROL_NODE_IP = "172.66.10.99"
 
-#Vagrant use the version 2 of the configure module and will use an object named "config" to execute our tasks
+  machines = {
+    "server-frontend" => "172.16.11.51",
+    "server-database" => "172.16.13.59",
+  }
+
 Vagrant.configure("2") do |config|
-    #now we iterate on the array of targets, and use an object named "vm1" to execute tasks on it.
-    #we will define it's network and a few specs.
-    TARGET_IPs.each_with_index do |ip, index|
-        config.vm.define "target#{index+1}" do |target|
-            target.vm.box = TARGET_IMAGES
-            target.vm.network "private_network", ip: ip
-            target.vm.provider "virtualbox" do |vb|
-                vb.memory = "512"
-                vb.cpus = 1
-            end
-            #the script will be slightly different, we will mostly install python to ensure ansible can work on those targets.
-            target.vm.provision "shell", path: './scripts/init-slaves.sh', args:[ip,index]
-            target.vm.hostname = "node0#{index+1}"
-        end
-    end
+  machines.each do |name, ip|
+    config.vm.define name do |vm|
+      vm.vm.box = "ubuntu/bionic64"
+      vm.vm.network "private_network", ip: ip
+      vm.vm.provider "virtualbox" do |vb|
+        vb.memory = "1024"
+        vb.cpus = 1
 
-    #then we create the vm, because it needs the target to exist in order to copy the keys on it.
-    config.vm.define "controlnode" do |vm1|
-        vm1.vm.box = CONTROL_NODE_IMAGE
+      vm.vm.provision "shell", inline: <<-SHELL
+        sudo apt update
+        sudo apt install -y python
+	sudo sed -i '/^PasswordAuthentication/c\PasswordAuthentication yes' /etc/ssh/sshd_config
+	sudo sed -i '/^#PubkeyAuthentication/c\PubkeyAuthentication yes' /etc/ssh/sshd_config
+	sudo systemctl restart sshd
+      SHELL
+      end
+    end
+  end
+
+
+    config.vm.define "ControlNode" do |vm1|
+        vm1.vm.box = "ubuntu/bionic64"
         vm1.vm.network "private_network", ip: CONTROL_NODE_IP
         vm1.vm.provider "virtualbox" do |vb|
-            vb.memory = "512"
+            vb.memory = "1024"
             vb.cpus = 1
+        vm1.vm.synced_folder "./Partage", "/home/vagrant/guest_dir", type: "virtualbox"
+        vm1.vm.provision "shell", inline: <<-SHELL
+	  sudo apt update 
+	  sudo apt install ansible -y 
+	  sudo apt install python
+	  sudo ssh-keygen -t rsa -b 4096 -N "" -f /root/.ssh/id_rsa
+	  sudo ssh-keygen -t rsa -b 4096 -N "" -f /home/vagrant/.ssh/id_rsa
+ 	  sudo cp /root/.ssh/id_rsa /home/vagrant/.ssh
+	  sudo cp /root/.ssh/id_rsa.pub /home/vagrant/.ssh
+   	  sudo chmod 700 ~/.ssh
+	  sudo chmod 600 ~/.ssh/id_rsa
+	  sudo chmod 600 ~/.ssh/id_rsa.pub
+	  sudo apt install sshpass
+	  sudo sshpass -p "vagrant" ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no vagrant@172.16.11.51
+	  sudo sshpass -p "vagrant" ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no vagrant@172.16.12.55
+	  sudo sshpass -p "vagrant" ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no vagrant@172.16.13.59
+	  sudo sh -c 'echo "
+[server-frontend]
+172.16.11.51
+
+[server-backend]
+172.16.12.55
+
+[server-database]
+172.16.13.59" >> /etc/ansible/hosts'
+	   chown -R vagrant:vagrant /home/vagrant/.ssh
+	   cd /home/vagrant/guest_dir
+	   sudo sh -c 'echo "[all:vars]\nansible_ssh_common_args=\"-o StrictHostKeyChecking=no\"" >> /etc/ansible/hosts'
+	  echo "
+[defaults]
+host_key_checking = False" | sudo tee -a /etc/ansible/ansible.cfg
+
+	  ansible-playbook installNGINX.yaml
+	  ansible-playbook installApacheTomcat.yaml
+	  ansible-playbook installmysql.yaml
+          SHELL
         end
-        #We will provision the machine with a shell command; meaning we will execute it on the VM as soon as it's ready.
-        #this command is quite simple : update then install ansible and add the DNS name "controlnode", then add the various targets to the ansible inventory
-        #BEWARE! there is a line looking like a comment but it will actually be executed because in shell that symbols is not a comment.
-        vm1.vm.provision "shell", path: "./scripts/init-control.sh", args: [CONTROL_NODE_IP, TARGET_IPs.join(","), "https://github.com/mikagouzee/vagrant-ansible"]
-        vm1.vm.hostname = "Controlnode"
     end
 end
+
+
