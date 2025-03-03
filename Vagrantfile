@@ -41,4 +41,18 @@ Vagrant.configure("2") do |config|
         vm1.vm.provision "shell", path: "./scripts/init-control.sh", args: [CONTROL_NODE_IP, TARGET_IPs.join(","), "https://github.com/mikagouzee/vagrant-ansible"]
         vm1.vm.hostname = "Controlnode"
     end
+
+    config.vm.define "jenkinsserver" do |jk|
+        jk.vm.box = "ubuntu/jammy64"
+        jk.vm.hostname = "jenkinsserver"
+        jk.vm.network "private_network", ip: "192.168.100.10"
+        jk.vm.network "forwarded_port", guest: 22, host: 2222, auto_correct: true
+        jk.vm.network "forwarded_port", guest: 8080, host: 8080, auto_correct: true
+        jk.vm.provider :virtualbox do |vb|
+            vb.memory = "2048"
+        end
+
+        jk.vm.provision "shell", path: "./scripts/init-jenkins.sh"
+
+    end
 end
