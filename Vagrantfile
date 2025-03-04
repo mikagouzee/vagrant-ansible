@@ -4,55 +4,44 @@
 #Define your variables here. You want ONE control plane, but probably multiple targets
 CONTROL_NODE_IP = "172.66.1.99"
 CONTROL_NODE_IMAGE = "gusztavvargadr/ubuntu-server-2404-lts"
-TARGET_IMAGES =  "gusztavvargadr/ubuntu-server-2404-lts"
-# TARGET_IPs = ["172.16.1.51", "172.16.2.51", "172.16.3.51"]
-TARGET_IPs = ["172.16.1.51"]
+# TARGET_IMAGES =  "gusztavvargadr/ubuntu-server-2404-lts"
+# # TARGET_IPs = ["172.16.1.51", "172.16.2.51", "172.16.3.51"]
+# TARGET_IPs = ["172.16.1.51"]
      
 
 #Vagrant use the version 2 of the configure module and will use an object named "config" to execute our tasks
 Vagrant.configure("2") do |config|
     #now we iterate on the array of targets, and use an object named "vm1" to execute tasks on it.
     #we will define it's network and a few specs.
-    TARGET_IPs.each_with_index do |ip, index|
-        config.vm.define "target#{index+1}" do |target|
-            target.vm.box = TARGET_IMAGES
-            target.vm.network "private_network", ip: ip
-            target.vm.provider "virtualbox" do |vb|
-                vb.memory = "512"
-                vb.cpus = 1
-            end
-            #the script will be slightly different, we will mostly install python to ensure ansible can work on those targets.
-            target.vm.provision "shell", path: './scripts/init-slaves.sh', args:[ip,index]
-            target.vm.hostname = "node0#{index+1}"
-        end
-    end
+    # TARGET_IPs.each_with_index do |ip, index|
+    #     config.vm.define "target#{index+1}" do |target|
+    #         target.vm.box = TARGET_IMAGES
+    #         target.vm.network "private_network", ip: ip
+    #         target.vm.provider "virtualbox" do |vb|
+    #             vb.memory = "512"
+    #             vb.cpus = 1
+    #         end
+    #         #the script will be slightly different, we will mostly install python to ensure ansible can work on those targets.
+    #         target.vm.provision "shell", path: './scripts/init-slaves.sh', args:[ip,index]
+    #         target.vm.hostname = "node0#{index+1}"
+    #     end
+    # end
 
     #then we create the vm, because it needs the target to exist in order to copy the keys on it.
     config.vm.define "controlnode" do |vm1|
         vm1.vm.box = CONTROL_NODE_IMAGE
         vm1.vm.network "private_network", ip: CONTROL_NODE_IP
+        vm1.vm.network "forwarded_port", guest: 22, host: 2222, auto_correct: true
+        vm1.vm.network "forwarded_port", guest:8080, host: 8080, auto_correct: true
         vm1.vm.provider "virtualbox" do |vb|
-            vb.memory = "512"
+            vb.memory = "2048"
             vb.cpus = 1
         end
         #We will provision the machine with a shell command; meaning we will execute it on the VM as soon as it's ready.
         #this command is quite simple : update then install ansible and add the DNS name "controlnode", then add the various targets to the ansible inventory
         #BEWARE! there is a line looking like a comment but it will actually be executed because in shell that symbols is not a comment.
         vm1.vm.provision "shell", path: "./scripts/init-control.sh", args: [CONTROL_NODE_IP, TARGET_IPs.join(","), "https://github.com/mikagouzee/vagrant-ansible"]
+        vm1.vm.provision "shell", path: "./scripts/init-jenkins.sh"
         vm1.vm.hostname = "Controlnode"
-    end
-
-    config.vm.define "jenkinsserver" do |jk|
-        jk.vm.box = "ubuntu/jammy64"
-        jk.vm.hostname = "jenkinsserver"
-        jk.vm.network "private_network", ip: "192.168.100.10"
-        jk.vm.network "forwarded_port", guest: 22, host: 2222, auto_correct: true
-        jk.vm.network "forwarded_port", guest: 8080, host: 8080, auto_correct: true
-        jk.vm.provider :virtualbox do |vb|
-            vb.memory = "2048"
-        end
-
-        jk.vm.provision "shell", path: "./scripts/init-jenkins.sh"
-
     end
 end
