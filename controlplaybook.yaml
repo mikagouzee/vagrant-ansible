@@ -1,0 +1,65 @@
+- name: Setup ControlNode and Configure Targets
+  hosts: localhost
+  become: yes
+  vars:
+    control_node_ip: "{{ control_node_ip }}"
+    target_ips: "{{target_ips | split (',') }}"
+    ssh_key_path: ".ssh/node0{{item.index}}/id_rsa"
+
+  tasks:
+    - name: Update package manager
+      apt:
+        update_cache: yes
+    
+    - name: Install required packages
+      apt: 
+        name:
+          - ansible=2.9.6
+          - sshpass
+          - git
+        state: present
+
+    - name: Add control node to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ control_node_ip }} controlnode"
+    
+    - name: Add target nodes to inventory
+      copy:
+        dest: /etc/ansibles/hosts
+        content: |
+          [targets]
+          {% for ip in target_ips %}
+          {{ ip }} ansible_ssh_private_key_file=.ssh/node0{{ loop.index }}/id_rsa
+          {% endfor %}
+
+    - name: Copy public keys to target nodes
+      command: bash ./vagrant-ansible/scripts/copy-key.sh {{ item.index }} {{ item.ip }}
+      loop: "{{ target_ips | map('regex_replace', '^(.*)$', '{\"ip\": \\1, \"index\": loop.index}') | list }}"
+      loop_control: 
+        label: "{{ item.ip }}"
+
+    - name: Add jenkins repository key
+      apt_key:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io.key
+        state: present
+
+    - name: Add jenkins repository
+      apt_repository:
+        repo: "deb https://pkg.jenkins.io/debian-stable binary/"
+        state: present
+
+    - name: Update package update_cache
+      apt:
+        update_cache: yes
+    
+    - name: Install jenkins
+      apt:
+        name: jenkins
+        state: present
+
+    - name: Start and enable Jenkins service
+      systemd: 
+        name: jenkins
+        state: started
+        enabled: yes
