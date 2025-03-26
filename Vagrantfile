@@ -13,7 +13,7 @@ TARGET_IPs = ["172.16.1.51", "172.16.2.51", "172.16.3.51"]
 
 #Vagrant use the version 2 of the configure module and will use an object named "config" to execute our tasks
 Vagrant.configure("2") do |config|
-    #now we iterate on the array of targets, and use an object named "vm1" to execute tasks on it.
+    #now we iterate on the array of targets, and use an object named "winbox" to execute tasks on it.
     #we will define it's network and a few specs.
     TARGET_IPs.each_with_index do |ip, index|
         config.vm.define "target#{index+1}" do |target|
@@ -24,45 +24,49 @@ Vagrant.configure("2") do |config|
                 vb.cpus = 1
             end
             #the script will be slightly different, we will mostly install python to ensure ansible can work on those targets.
-            target.vm.provision "shell", path: './scripts/init-slaves.sh', args:[ip,index]
+            target.vm.provision "shell", path: './scripts/init-nodes.sh', args:[ip,index]
             target.vm.hostname = "node0#{index+1}"
         end
     end
 
-    config.vm.define "testnode" do |vm1|
-        vm1.vm.box = WINDOWS_BOX
-        vm1.vm.network "private_network", ip: "172.16.10.51"
-        vm1.vm.network "forwarded_port", guest: 22, host: 2222, auto_correct: true
-        vm1.vm.network "forwarded_port", guest:8080, host: 8080, auto_correct: true
-        vm1.vm.provider "virtualbox" do |vb|
+    config.vm.define "windows-node" do |winbox|
+        winbox.vm.box = WINDOWS_BOX
+        winbox.vm.network "private_network", ip: "172.16.10.51"
+        winbox.vm.network "forwarded_port", guest: 22, host: 2222, auto_correct: true
+        winbox.vm.network "forwarded_port", guest:8080, host: 8080, auto_correct: true
+        winbox.vm.boot_timeout = 600
+        winbox.vm.provider "virtualbox" do |vb|
             vb.memory = "2048"
             vb.cpus = 4
         end
-        vm1.vm.hostname = "TestNode"
+        winbox.vm.hostname = "TestNode"
     end
 
     #then we create the vm, because it needs the target to exist in order to copy the keys on it.
-    config.vm.define "controlnode" do |vm1|
-        vm1.vm.box = CONTROL_NODE_IMAGE
-        vm1.vm.network "private_network", ip: CONTROL_NODE_IP
-        vm1.vm.network "forwarded_port", guest: 22, host: 2222, auto_correct: true
-        vm1.vm.network "forwarded_port", guest:8080, host: 8080, auto_correct: true
-        vm1.vm.provider "virtualbox" do |vb|
+    config.vm.define "controlnode" do |controlnode|
+        controlnode.vm.box = CONTROL_NODE_IMAGE
+        controlnode.vm.network "private_network", ip: CONTROL_NODE_IP
+        controlnode.vm.network "forwarded_port", guest: 22, host: 2222, auto_correct: true
+        controlnode.vm.network "forwarded_port", guest:8080, host: 8080, auto_correct: true
+        controlnode.vm.boot_timeout = 600
+        controlnode.vm.provider "virtualbox" do |vb|
             vb.memory = "2048"
             vb.cpus = 4
         end
         #We will provision the machine with a shell command; meaning we will execute it on the VM as soon as it's ready.
         #this command is quite simple : update then install ansible and add the DNS name "controlnode", then add the various targets to the ansible inventory
         #BEWARE! there is a line looking like a comment but it will actually be executed because in shell that symbols is not a comment.
-        vm1.vm.provision "shell", path: "./scripts/init-control.sh", args: [CONTROL_NODE_IP, TARGET_IPs.join(","), "https://github.com/mikagouzee/vagrant-ansible"]
-        # vm1.vm.provision "shell", path: "./scripts/init-control-ansible.sh"
-        # vm1.vm.provision "ansible_local" do |ansible|
-        #     ansible.playbook = "./controlplaybook.yaml"
-        #     ansible.extra_vars = {
-        #         control_node_ip: CONTROL_NODE_IP,
-        #         target_ips: TARGET_IPs.join(",")
-        #     }
-        vm1.vm.provision "shell", path: "./scripts/init-jenkins.sh"
-        vm1.vm.hostname = "Controlnode"
+        # controlnode.vm.provision "shell", path: "./scripts/init-control.sh", args: [CONTROL_NODE_IP, TARGET_IPs.join(","), "https://github.com/mikagouzee/vagrant-ansible"]
+        controlnode.vm.provision "shell", path: "./scripts/init-control-ansible.sh", args: TARGET_IPs
+        controlnode.vm.provision "ansible_local" do |ansible|
+            ansible.playbook = "./controlplaybook.yaml"
+            ansible.inventory_path = "/etc/ansible/hosts"
+            ansible.limit = "localhost"
+            ansible.extra_vars = {
+                control_node_ip: CONTROL_NODE_IP,
+                target_ips: TARGET_IPs
+            }
+        end
+        controlnode.vm.hostname = "controlnode"
     end
 end

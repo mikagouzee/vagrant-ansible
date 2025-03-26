@@ -1,5 +1,0 @@
-#!/bin/bash -x
-
-# Install Ansible on the control node
-apt-get update -y
-apt-get install -y ansible=2.9.6

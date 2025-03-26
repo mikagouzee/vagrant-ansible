@@ -3,18 +3,22 @@
   become: yes
   vars:
     control_node_ip: "{{ control_node_ip }}"
-    target_ips: "{{target_ips | split (',') }}"
-    ssh_key_path: ".ssh/node0{{item.index}}/id_rsa"
+    target_ips: "{{ target_ips }}"
+    ssh_key_dir: "/tmp/ssh_keys"
+
 
   tasks:
+    - name: Debug target_ips
+      debug:
+        var: target_ips
+
     - name: Update package manager
       apt:
         update_cache: yes
-    
+
     - name: Install required packages
       apt: 
         name:
-          - ansible=2.9.6
           - sshpass
           - git
         state: present
@@ -23,21 +27,40 @@
       lineinfile:
         path: /etc/hosts
         line: "{{ control_node_ip }} controlnode"
-    
+
     - name: Add target nodes to inventory
       copy:
-        dest: /etc/ansibles/hosts
+        dest: /etc/ansible/hosts
         content: |
           [targets]
           {% for ip in target_ips %}
-          {{ ip }} ansible_ssh_private_key_file=.ssh/node0{{ loop.index }}/id_rsa
+          {{ ip }} ansible_ssh_private_key_file=.ssh/node0{{ loop.index0 }}/id_rsa
           {% endfor %}
 
-    - name: Copy public keys to target nodes
-      command: bash ./vagrant-ansible/scripts/copy-key.sh {{ item.index }} {{ item.ip }}
-      loop: "{{ target_ips | map('regex_replace', '^(.*)$', '{\"ip\": \\1, \"index\": loop.index}') | list }}"
-      loop_control: 
-        label: "{{ item.ip }}"
+    - name: Ensure SSH key directory exists
+      file:
+        path: "{{ ssh_key_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Generate SSH key for each target
+      command: ssh-keygen -t rsa -b 2048 -f "{{ ssh_key_dir }}/id_rsa_{{ item }}" -q -N ""
+      loop: "{{ target_ips }}"
+      loop_control:
+        label: "{{ item }}"
+      args:
+        creates: "{{ ssh_key_dir }}/id_rsa_{{ item }}"
+
+    - name: Distribute public key to target nodes
+      copy:
+        src: "{{ ssh_key_dir }}/id_rsa_{{ item }}.pub"
+        dest: "/home/vagrant/.ssh/authorized_keys"
+        owner: vagrant
+        group: vagrant
+        mode: '0600'
+      loop: "{{ target_ips }}"
+      delegate_to: "{{ item }}"
+
 
     - name: Add jenkins repository key
       apt_key:
@@ -52,8 +75,8 @@
     - name: Update package update_cache
       apt:
         update_cache: yes
-    
-    - name: Install jenkins
+
+    - name: Install Jenkins
       apt:
         name: jenkins
         state: present
