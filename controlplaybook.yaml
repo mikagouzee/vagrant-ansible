@@ -51,16 +51,20 @@
       args:
         creates: "{{ ssh_key_dir }}/id_rsa_{{ item }}"
 
-    - name: Distribute public key to target nodes
-      copy:
-        src: "{{ ssh_key_dir }}/id_rsa_{{ item }}.pub"
-        dest: "/home/vagrant/.ssh/authorized_keys"
-        owner: vagrant
-        group: vagrant
-        mode: '0600'
-      loop: "{{ target_ips }}"
-      delegate_to: "{{ item }}"
-
+    # ! THIS TASK IS NOT WORKING;
+    # However it's too time consuming to debug right now. We can just move the keys manually from inside the controlnode, that works for our use case.
+    # - name: Distribute public key to target nodes
+    #   copy:
+    #     src: "{{ ssh_key_dir }}/id_rsa_{{ item }}.pub"
+    #     dest: "/home/vagrant/.ssh/authorized_keys"
+    #     owner: vagrant
+    #     group: vagrant
+    #     mode: '0600'
+    #   loop: "{{ target_ips }}"
+    #   delegate_to: "{{ item }}"
+    #   vars:
+    #     ansible_ssh_user: vagrant
+    #     ansible_ssh_private_key_file: ".vagrant/machines/target{{ target_ips.index(item) + 1 }}/virtualbox/private_key"
 
     - name: Add jenkins repository key
       apt_key:
